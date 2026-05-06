@@ -4,11 +4,14 @@ import com.hackaton.reportapi.application.dto.UpdateReportStatusRequestDTO;
 import com.hackaton.reportapi.domain.entity.Report;
 import com.hackaton.reportapi.domain.entity.ReportStatus;
 import com.hackaton.reportapi.domain.entity.ReportType;
+import com.hackaton.reportapi.domain.event.ReportStatusEvent;
+import com.hackaton.reportapi.domain.gateway.EventPublisherGateway;
 import com.hackaton.reportapi.domain.gateway.ReportRepository;
 import com.hackaton.reportapi.exceptions.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -28,6 +31,9 @@ class UpdateReportStatusUseCaseTest {
     @Mock
     private ReportRepository reportRepository;
 
+    @Mock
+    private EventPublisherGateway eventPublisherGateway;
+
     @InjectMocks
     private UpdateReportStatusUseCase updateReportStatusUseCase;
 
@@ -41,6 +47,7 @@ class UpdateReportStatusUseCaseTest {
                 .type(ReportType.INVENTORY)
                 .status(ReportStatus.PENDING)
                 .createdBy("user-789")
+                .s3Key("reports/report-id-1.json")
                 .createdAt(LocalDateTime.now().minusHours(1))
                 .updatedAt(LocalDateTime.now().minusHours(1))
                 .build();
@@ -55,6 +62,7 @@ class UpdateReportStatusUseCaseTest {
                 .type(ReportType.INVENTORY)
                 .status(ReportStatus.COMPLETED)
                 .createdBy("user-789")
+                .s3Key("reports/report-id-1.json")
                 .createdAt(existingReport.getCreatedAt())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -66,6 +74,32 @@ class UpdateReportStatusUseCaseTest {
 
         assertThat(result.getStatus()).isEqualTo(ReportStatus.COMPLETED);
         verify(reportRepository).save(any(Report.class));
+    }
+
+    @Test
+    void execute_shouldPublishEventToSqsAfterStatusUpdate() {
+        var request = new UpdateReportStatusRequestDTO(ReportStatus.COMPLETED);
+        var updatedReport = Report.builder()
+                .id("report-id-1")
+                .status(ReportStatus.COMPLETED)
+                .s3Key("reports/report-id-1.json")
+                .createdAt(existingReport.getCreatedAt())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        when(reportRepository.findById("report-id-1")).thenReturn(Optional.of(existingReport));
+        when(reportRepository.save(any(Report.class))).thenReturn(updatedReport);
+
+        updateReportStatusUseCase.execute("report-id-1", request);
+
+        var captor = ArgumentCaptor.forClass(ReportStatusEvent.class);
+        verify(eventPublisherGateway).publish(captor.capture());
+
+        var event = captor.getValue();
+        assertThat(event.getReportId()).isEqualTo("report-id-1");
+        assertThat(event.getStatus()).isEqualTo(ReportStatus.COMPLETED);
+        assertThat(event.getS3Key()).isEqualTo("reports/report-id-1.json");
+        assertThat(event.getUpdatedAt()).isNotNull();
     }
 
     @Test
