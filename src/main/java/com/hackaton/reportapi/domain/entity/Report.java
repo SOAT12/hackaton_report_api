@@ -8,6 +8,7 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -15,10 +16,9 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Report {
-    private String id;
+    private UUID id;
     private String title;
     private String description;
-    private ReportType type;
     private ReportStatus status;
     private String createdBy;
     private Map<String, Object> data;

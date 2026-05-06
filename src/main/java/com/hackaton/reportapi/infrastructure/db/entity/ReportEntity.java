@@ -1,18 +1,14 @@
 package com.hackaton.reportapi.infrastructure.db.entity;
 
 import com.hackaton.reportapi.domain.entity.ReportStatus;
-import com.hackaton.reportapi.domain.entity.ReportType;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -23,11 +19,10 @@ import java.util.Map;
 public class ReportEntity {
 
     @Id
-    private String id;
+    private UUID id;
 
     private String title;
     private String description;
-    private ReportType type;
 
     @Indexed
     private ReportStatus status;
