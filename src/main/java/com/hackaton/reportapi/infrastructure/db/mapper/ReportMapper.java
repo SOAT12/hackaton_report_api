@@ -17,6 +17,7 @@ public class ReportMapper {
                 .status(report.getStatus())
                 .createdBy(report.getCreatedBy())
                 .data(report.getData())
+                .s3Key(report.getS3Key())
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())
                 .build();
@@ -32,6 +33,7 @@ public class ReportMapper {
                 .status(entity.getStatus())
                 .createdBy(entity.getCreatedBy())
                 .data(entity.getData())
+                .s3Key(entity.getS3Key())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
