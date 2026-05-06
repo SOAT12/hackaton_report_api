@@ -34,6 +34,7 @@ public class ReportEntity {
 
     private String createdBy;
     private Map<String, Object> data;
+    private String s3Key;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -1,10 +1,13 @@
 package com.hackaton.reportapi.application.usecase;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hackaton.reportapi.application.dto.CreateReportRequestDTO;
 import com.hackaton.reportapi.application.dto.ReportResponseDTO;
 import com.hackaton.reportapi.domain.entity.Report;
 import com.hackaton.reportapi.domain.entity.ReportStatus;
 import com.hackaton.reportapi.domain.gateway.ReportRepository;
+import com.hackaton.reportapi.domain.gateway.StorageGateway;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +18,8 @@ import java.time.LocalDateTime;
 public class CreateReportUseCase {
 
     private final ReportRepository reportRepository;
+    private final StorageGateway storageGateway;
+    private final ObjectMapper objectMapper;
 
     public ReportResponseDTO execute(CreateReportRequestDTO request) {
         var now = LocalDateTime.now();
@@ -32,7 +37,21 @@ public class CreateReportUseCase {
 
         var saved = reportRepository.save(report);
 
-        return toResponseDTO(saved);
+        var s3Key = uploadToStorage(saved);
+        saved.setS3Key(s3Key);
+        var updated = reportRepository.save(saved);
+
+        return toResponseDTO(updated);
+    }
+
+    private String uploadToStorage(Report report) {
+        try {
+            var key = "reports/" + report.getId() + ".json";
+            var content = objectMapper.writeValueAsString(report);
+            return storageGateway.upload(key, content);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize report for storage", e);
+        }
     }
 
     private ReportResponseDTO toResponseDTO(Report report) {
@@ -44,6 +63,7 @@ public class CreateReportUseCase {
                 .status(report.getStatus())
                 .createdBy(report.getCreatedBy())
                 .data(report.getData())
+                .s3Key(report.getS3Key())
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())
                 .build();
