@@ -13,8 +13,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
-import java.time.LocalDateTime;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -42,7 +40,7 @@ class SqsEventPublisherGatewayTest {
     @Test
     void publish_shouldSendMessageToSqsWithCorrectQueueUrl() throws JsonProcessingException {
         var event = buildEvent(ReportStatus.COMPLETED);
-        when(objectMapper.writeValueAsString(event)).thenReturn("{\"reportId\":\"report-id-1\"}");
+        when(objectMapper.writeValueAsString(event)).thenReturn("{\"diagramId\":\"diag-1\"}");
 
         gateway.publish(event);
 
@@ -54,7 +52,7 @@ class SqsEventPublisherGatewayTest {
     @Test
     void publish_shouldSendSerializedEventAsMessageBody() throws JsonProcessingException {
         var event = buildEvent(ReportStatus.COMPLETED);
-        var expectedBody = "{\"reportId\":\"report-id-1\",\"status\":\"COMPLETED\"}";
+        var expectedBody = "{\"diagramId\":\"diag-1\",\"status\":\"COMPLETED\",\"reportLink\":\"http://host/api/reports/1\",\"notes\":\"\"}";
         when(objectMapper.writeValueAsString(event)).thenReturn(expectedBody);
 
         gateway.publish(event);
@@ -76,10 +74,10 @@ class SqsEventPublisherGatewayTest {
 
     private ReportStatusEvent buildEvent(ReportStatus status) {
         return ReportStatusEvent.builder()
-                .reportId("report-id-1")
+                .diagramId("diag-1")
                 .status(status)
-                .s3Key("reports/report-id-1.json")
-                .updatedAt(LocalDateTime.now())
+                .reportLink("http://host/api/reports/1")
+                .notes("")
                 .build();
     }
 }

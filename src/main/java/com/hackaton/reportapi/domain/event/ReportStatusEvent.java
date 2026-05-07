@@ -6,15 +6,13 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ReportStatusEvent {
-    private String reportId;
+    private String diagramId;
     private ReportStatus status;
-    private String s3Key;
-    private LocalDateTime updatedAt;
+    private String reportLink;
+    private String notes;
 }

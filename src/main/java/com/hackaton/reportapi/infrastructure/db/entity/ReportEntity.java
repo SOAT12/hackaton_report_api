@@ -1,14 +1,17 @@
 package com.hackaton.reportapi.infrastructure.db.entity;
 
+import com.hackaton.reportapi.domain.entity.ReportContent;
 import com.hackaton.reportapi.domain.entity.ReportStatus;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
-import java.util.Map;
-import java.util.UUID;
 
 @Getter
 @Setter
@@ -19,17 +22,18 @@ import java.util.UUID;
 public class ReportEntity {
 
     @Id
-    private UUID id;
+    private String id;
+
+    @Indexed
+    private String diagramId;
 
     private String title;
-    private String description;
+    private ReportContent report;
 
     @Indexed
     private ReportStatus status;
 
-    private String createdBy;
-    private Map<String, Object> data;
-    private String s3Key;
+    private String reportUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

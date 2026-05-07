@@ -27,6 +27,26 @@ spec:
                 secretKeyRef:
                   name: report-secrets
                   key: MONGODB_URI
+            - name: AWS_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: report-secrets
+                  key: AWS_REGION
+            - name: AWS_S3_BUCKET_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: report-secrets
+                  key: AWS_S3_BUCKET_NAME
+            - name: AWS_SQS_STATUS_UPDATE_QUEUE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: report-secrets
+                  key: AWS_SQS_STATUS_UPDATE_QUEUE_URL
+            - name: APP_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: report-secrets
+                  key: APP_BASE_URL
           livenessProbe:
             httpGet:
               path: /actuator/health

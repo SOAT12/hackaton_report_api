@@ -1,8 +1,8 @@
 package com.hackaton.reportapi.infrastructure.db.gateway;
 
 import com.hackaton.reportapi.domain.entity.Report;
+import com.hackaton.reportapi.domain.entity.ReportContent;
 import com.hackaton.reportapi.domain.entity.ReportStatus;
-import com.hackaton.reportapi.domain.entity.ReportType;
 import com.hackaton.reportapi.infrastructure.db.entity.ReportEntity;
 import com.hackaton.reportapi.infrastructure.db.mapper.ReportMapper;
 import com.hackaton.reportapi.infrastructure.db.repository.SpringDataReportRepository;
@@ -39,22 +39,30 @@ class ReportRepositoryImplTest {
 
     @BeforeEach
     void setUp() {
+        var content = ReportContent.builder()
+                .components(List.of("component_01"))
+                .risks(List.of("risk_01"))
+                .recommendations(List.of("rec_01"))
+                .build();
+
         report = Report.builder()
                 .id("id-1")
+                .diagramId("diagram-id-1")
                 .title("Test")
-                .type(ReportType.SALES)
-                .status(ReportStatus.PENDING)
-                .createdBy("user-1")
+                .report(content)
+                .status(ReportStatus.COMPLETED)
+                .reportUrl("http://localhost:8080/api/reports/id-1")
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
 
         entity = ReportEntity.builder()
                 .id("id-1")
+                .diagramId("diagram-id-1")
                 .title("Test")
-                .type(ReportType.SALES)
-                .status(ReportStatus.PENDING)
-                .createdBy("user-1")
+                .report(content)
+                .status(ReportStatus.COMPLETED)
+                .reportUrl("http://localhost:8080/api/reports/id-1")
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -103,12 +111,12 @@ class ReportRepositoryImplTest {
 
     @Test
     void findByStatus_shouldFilterAndMap() {
-        when(springDataReportRepository.findByStatus(ReportStatus.PENDING)).thenReturn(List.of(entity));
+        when(springDataReportRepository.findByStatus(ReportStatus.COMPLETED)).thenReturn(List.of(entity));
         when(reportMapper.toDomain(entity)).thenReturn(report);
 
-        var result = reportRepositoryImpl.findByStatus(ReportStatus.PENDING);
+        var result = reportRepositoryImpl.findByStatus(ReportStatus.COMPLETED);
 
         assertThat(result).hasSize(1).contains(report);
-        verify(springDataReportRepository).findByStatus(ReportStatus.PENDING);
+        verify(springDataReportRepository).findByStatus(ReportStatus.COMPLETED);
     }
 }

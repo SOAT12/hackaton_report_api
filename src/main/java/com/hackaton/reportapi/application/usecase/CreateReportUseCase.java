@@ -6,64 +6,92 @@ import com.hackaton.reportapi.application.dto.CreateReportRequestDTO;
 import com.hackaton.reportapi.application.dto.ReportResponseDTO;
 import com.hackaton.reportapi.domain.entity.Report;
 import com.hackaton.reportapi.domain.entity.ReportStatus;
+import com.hackaton.reportapi.domain.event.ReportStatusEvent;
+import com.hackaton.reportapi.domain.gateway.EventPublisherGateway;
 import com.hackaton.reportapi.domain.gateway.ReportRepository;
 import com.hackaton.reportapi.domain.gateway.StorageGateway;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class CreateReportUseCase {
 
     private final ReportRepository reportRepository;
     private final StorageGateway storageGateway;
+    private final EventPublisherGateway eventPublisherGateway;
     private final ObjectMapper objectMapper;
+    private final String baseUrl;
+
+    public CreateReportUseCase(
+            ReportRepository reportRepository,
+            StorageGateway storageGateway,
+            EventPublisherGateway eventPublisherGateway,
+            ObjectMapper objectMapper,
+            @Value("${app.base-url}") String baseUrl) {
+        this.reportRepository = reportRepository;
+        this.storageGateway = storageGateway;
+        this.eventPublisherGateway = eventPublisherGateway;
+        this.objectMapper = objectMapper;
+        this.baseUrl = baseUrl;
+    }
 
     public ReportResponseDTO execute(CreateReportRequestDTO request) {
+        var id = UUID.randomUUID().toString();
+        var reportUrl = baseUrl + "/api/reports/" + id;
         var now = LocalDateTime.now();
 
         var report = Report.builder()
+                .id(id)
+                .diagramId(request.getDiagramId().toString())
                 .title(request.getTitle())
-                .description(request.getDescription())
-                .type(request.getType())
-                .status(ReportStatus.PENDING)
-                .createdBy(request.getCreatedBy())
-                .data(request.getData())
+                .report(request.getReport())
+                .status(ReportStatus.COMPLETED)
+                .reportUrl(reportUrl)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
 
         var saved = reportRepository.save(report);
 
-        var s3Key = uploadToStorage(saved);
-        saved.setS3Key(s3Key);
-        var updated = reportRepository.save(saved);
+        uploadToStorage(saved);
 
-        return toResponseDTO(updated);
+        eventPublisherGateway.publish(ReportStatusEvent.builder()
+                .diagramId(saved.getDiagramId())
+                .status(ReportStatus.COMPLETED)
+                .reportLink(saved.getReportUrl())
+                .notes("")
+                .build());
+
+        return toResponseDTO(saved);
     }
 
-    private String uploadToStorage(Report report) {
+    private void uploadToStorage(Report report) {
         try {
             var key = "reports/" + report.getId() + ".json";
-            var content = objectMapper.writeValueAsString(report);
-            return storageGateway.upload(key, content);
+            var payload = Map.of(
+                    "reportId", report.getId(),
+                    "diagramId", report.getDiagramId(),
+                    "url", report.getReportUrl()
+            );
+            var content = objectMapper.writeValueAsString(payload);
+            storageGateway.upload(key, content);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to serialize report for storage", e);
+            throw new RuntimeException("Failed to serialize report reference for storage", e);
         }
     }
 
     private ReportResponseDTO toResponseDTO(Report report) {
         return ReportResponseDTO.builder()
                 .id(report.getId())
+                .diagramId(report.getDiagramId())
                 .title(report.getTitle())
-                .description(report.getDescription())
-                .type(report.getType())
+                .report(report.getReport())
                 .status(report.getStatus())
-                .createdBy(report.getCreatedBy())
-                .data(report.getData())
-                .s3Key(report.getS3Key())
+                .reportUrl(report.getReportUrl())
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())
                 .build();

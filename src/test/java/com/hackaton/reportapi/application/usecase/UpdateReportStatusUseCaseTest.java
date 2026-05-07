@@ -3,7 +3,6 @@ package com.hackaton.reportapi.application.usecase;
 import com.hackaton.reportapi.application.dto.UpdateReportStatusRequestDTO;
 import com.hackaton.reportapi.domain.entity.Report;
 import com.hackaton.reportapi.domain.entity.ReportStatus;
-import com.hackaton.reportapi.domain.entity.ReportType;
 import com.hackaton.reportapi.domain.event.ReportStatusEvent;
 import com.hackaton.reportapi.domain.gateway.EventPublisherGateway;
 import com.hackaton.reportapi.domain.gateway.ReportRepository;
@@ -43,11 +42,10 @@ class UpdateReportStatusUseCaseTest {
     void setUp() {
         existingReport = Report.builder()
                 .id("report-id-1")
-                .title("Inventory Report")
-                .type(ReportType.INVENTORY)
-                .status(ReportStatus.PENDING)
-                .createdBy("user-789")
-                .s3Key("reports/report-id-1.json")
+                .diagramId("3f1c2b6e-9d4a-4d8f-8c3b-1e7f6a9d2c55")
+                .title("Architecture Report")
+                .status(ReportStatus.COMPLETED)
+                .reportUrl("http://localhost:8080/api/reports/report-id-1")
                 .createdAt(LocalDateTime.now().minusHours(1))
                 .updatedAt(LocalDateTime.now().minusHours(1))
                 .build();
@@ -55,14 +53,12 @@ class UpdateReportStatusUseCaseTest {
 
     @Test
     void execute_shouldUpdateStatusSuccessfully() {
-        var request = new UpdateReportStatusRequestDTO(ReportStatus.COMPLETED);
+        var request = new UpdateReportStatusRequestDTO(ReportStatus.FAILED);
         var updatedReport = Report.builder()
                 .id("report-id-1")
-                .title("Inventory Report")
-                .type(ReportType.INVENTORY)
-                .status(ReportStatus.COMPLETED)
-                .createdBy("user-789")
-                .s3Key("reports/report-id-1.json")
+                .diagramId("3f1c2b6e-9d4a-4d8f-8c3b-1e7f6a9d2c55")
+                .status(ReportStatus.FAILED)
+                .reportUrl(existingReport.getReportUrl())
                 .createdAt(existingReport.getCreatedAt())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -72,17 +68,18 @@ class UpdateReportStatusUseCaseTest {
 
         var result = updateReportStatusUseCase.execute("report-id-1", request);
 
-        assertThat(result.getStatus()).isEqualTo(ReportStatus.COMPLETED);
+        assertThat(result.getStatus()).isEqualTo(ReportStatus.FAILED);
         verify(reportRepository).save(any(Report.class));
     }
 
     @Test
     void execute_shouldPublishEventToSqsAfterStatusUpdate() {
-        var request = new UpdateReportStatusRequestDTO(ReportStatus.COMPLETED);
+        var request = new UpdateReportStatusRequestDTO(ReportStatus.FAILED);
         var updatedReport = Report.builder()
                 .id("report-id-1")
-                .status(ReportStatus.COMPLETED)
-                .s3Key("reports/report-id-1.json")
+                .diagramId("3f1c2b6e-9d4a-4d8f-8c3b-1e7f6a9d2c55")
+                .status(ReportStatus.FAILED)
+                .reportUrl("http://localhost:8080/api/reports/report-id-1")
                 .createdAt(existingReport.getCreatedAt())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -96,10 +93,10 @@ class UpdateReportStatusUseCaseTest {
         verify(eventPublisherGateway).publish(captor.capture());
 
         var event = captor.getValue();
-        assertThat(event.getReportId()).isEqualTo("report-id-1");
-        assertThat(event.getStatus()).isEqualTo(ReportStatus.COMPLETED);
-        assertThat(event.getS3Key()).isEqualTo("reports/report-id-1.json");
-        assertThat(event.getUpdatedAt()).isNotNull();
+        assertThat(event.getDiagramId()).isEqualTo("3f1c2b6e-9d4a-4d8f-8c3b-1e7f6a9d2c55");
+        assertThat(event.getStatus()).isEqualTo(ReportStatus.FAILED);
+        assertThat(event.getReportLink()).isEqualTo("http://localhost:8080/api/reports/report-id-1");
+        assertThat(event.getNotes()).isEmpty();
     }
 
     @Test
@@ -110,23 +107,5 @@ class UpdateReportStatusUseCaseTest {
         assertThatThrownBy(() -> updateReportStatusUseCase.execute("missing-id", request))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("missing-id");
-    }
-
-    @Test
-    void execute_shouldUpdateToProcessingStatus() {
-        var request = new UpdateReportStatusRequestDTO(ReportStatus.PROCESSING);
-        var updatedReport = Report.builder()
-                .id("report-id-1")
-                .status(ReportStatus.PROCESSING)
-                .createdAt(existingReport.getCreatedAt())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        when(reportRepository.findById("report-id-1")).thenReturn(Optional.of(existingReport));
-        when(reportRepository.save(any(Report.class))).thenReturn(updatedReport);
-
-        var result = updateReportStatusUseCase.execute("report-id-1", request);
-
-        assertThat(result.getStatus()).isEqualTo(ReportStatus.PROCESSING);
     }
 }
