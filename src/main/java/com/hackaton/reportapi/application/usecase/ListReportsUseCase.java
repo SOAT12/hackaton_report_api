@@ -28,12 +28,11 @@ public class ListReportsUseCase {
     private ReportResponseDTO toResponseDTO(Report report) {
         return ReportResponseDTO.builder()
                 .id(report.getId())
+                .diagramId(report.getDiagramId())
                 .title(report.getTitle())
-                .description(report.getDescription())
-                .type(report.getType())
+                .report(report.getReport())
                 .status(report.getStatus())
-                .createdBy(report.getCreatedBy())
-                .data(report.getData())
+                .reportUrl(report.getReportUrl())
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())
                 .build();

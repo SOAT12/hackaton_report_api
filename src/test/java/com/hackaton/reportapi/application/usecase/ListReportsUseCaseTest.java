@@ -1,8 +1,8 @@
 package com.hackaton.reportapi.application.usecase;
 
 import com.hackaton.reportapi.domain.entity.Report;
+import com.hackaton.reportapi.domain.entity.ReportContent;
 import com.hackaton.reportapi.domain.entity.ReportStatus;
-import com.hackaton.reportapi.domain.entity.ReportType;
 import com.hackaton.reportapi.domain.gateway.ReportRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,22 +31,30 @@ class ListReportsUseCaseTest {
 
     @BeforeEach
     void setUp() {
+        var content = ReportContent.builder()
+                .components(List.of("component_01"))
+                .risks(List.of("risk_01"))
+                .recommendations(List.of("rec_01"))
+                .build();
+
         reports = List.of(
                 Report.builder()
                         .id("id-1")
+                        .diagramId("diagram-id-1")
                         .title("Report 1")
-                        .type(ReportType.SALES)
-                        .status(ReportStatus.PENDING)
-                        .createdBy("user-1")
+                        .report(content)
+                        .status(ReportStatus.COMPLETED)
+                        .reportUrl("http://localhost:8080/api/reports/id-1")
                         .createdAt(LocalDateTime.now())
                         .updatedAt(LocalDateTime.now())
                         .build(),
                 Report.builder()
                         .id("id-2")
+                        .diagramId("diagram-id-2")
                         .title("Report 2")
-                        .type(ReportType.FINANCIAL)
+                        .report(content)
                         .status(ReportStatus.COMPLETED)
-                        .createdBy("user-2")
+                        .reportUrl("http://localhost:8080/api/reports/id-2")
                         .createdAt(LocalDateTime.now())
                         .updatedAt(LocalDateTime.now())
                         .build()
@@ -65,14 +73,14 @@ class ListReportsUseCaseTest {
 
     @Test
     void execute_withStatus_shouldFilterByStatus() {
-        var pending = List.of(reports.get(0));
-        when(reportRepository.findByStatus(ReportStatus.PENDING)).thenReturn(pending);
+        var completed = List.of(reports.get(0));
+        when(reportRepository.findByStatus(ReportStatus.COMPLETED)).thenReturn(completed);
 
-        var result = listReportsUseCase.execute(ReportStatus.PENDING);
+        var result = listReportsUseCase.execute(ReportStatus.COMPLETED);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getStatus()).isEqualTo(ReportStatus.PENDING);
-        verify(reportRepository).findByStatus(ReportStatus.PENDING);
+        assertThat(result.get(0).getStatus()).isEqualTo(ReportStatus.COMPLETED);
+        verify(reportRepository).findByStatus(ReportStatus.COMPLETED);
     }
 
     @Test
@@ -82,7 +90,7 @@ class ListReportsUseCaseTest {
         var result = listReportsUseCase.execute(null);
 
         assertThat(result.get(0).getId()).isEqualTo("id-1");
-        assertThat(result.get(0).getTitle()).isEqualTo("Report 1");
+        assertThat(result.get(0).getDiagramId()).isEqualTo("diagram-id-1");
         assertThat(result.get(1).getId()).isEqualTo("id-2");
     }
 

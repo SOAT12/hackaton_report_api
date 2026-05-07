@@ -1,8 +1,8 @@
 package com.hackaton.reportapi.application.usecase;
 
 import com.hackaton.reportapi.domain.entity.Report;
+import com.hackaton.reportapi.domain.entity.ReportContent;
 import com.hackaton.reportapi.domain.entity.ReportStatus;
-import com.hackaton.reportapi.domain.entity.ReportType;
 import com.hackaton.reportapi.domain.gateway.ReportRepository;
 import com.hackaton.reportapi.exceptions.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,11 +35,15 @@ class GetReportUseCaseTest {
     void setUp() {
         report = Report.builder()
                 .id("report-id-1")
-                .title("Financial Report")
-                .description("Annual financial summary")
-                .type(ReportType.FINANCIAL)
+                .diagramId("3f1c2b6e-9d4a-4d8f-8c3b-1e7f6a9d2c55")
+                .title("Architecture Report")
+                .report(ReportContent.builder()
+                        .components(List.of("component_01"))
+                        .risks(List.of("risk_01"))
+                        .recommendations(List.of("rec_01"))
+                        .build())
                 .status(ReportStatus.COMPLETED)
-                .createdBy("user-456")
+                .reportUrl("http://localhost:8080/api/reports/report-id-1")
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -52,7 +57,7 @@ class GetReportUseCaseTest {
 
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo("report-id-1");
-        assertThat(result.getTitle()).isEqualTo("Financial Report");
+        assertThat(result.getTitle()).isEqualTo("Architecture Report");
         assertThat(result.getStatus()).isEqualTo(ReportStatus.COMPLETED);
     }
 
@@ -71,8 +76,9 @@ class GetReportUseCaseTest {
 
         var result = getReportUseCase.execute("report-id-1");
 
-        assertThat(result.getType()).isEqualTo(ReportType.FINANCIAL);
-        assertThat(result.getCreatedBy()).isEqualTo("user-456");
+        assertThat(result.getDiagramId()).isEqualTo("3f1c2b6e-9d4a-4d8f-8c3b-1e7f6a9d2c55");
+        assertThat(result.getReport()).isNotNull();
+        assertThat(result.getReportUrl()).isEqualTo("http://localhost:8080/api/reports/report-id-1");
         assertThat(result.getCreatedAt()).isNotNull();
         assertThat(result.getUpdatedAt()).isNotNull();
     }

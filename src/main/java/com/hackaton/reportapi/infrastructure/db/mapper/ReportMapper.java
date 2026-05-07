@@ -11,12 +11,11 @@ public class ReportMapper {
         if (report == null) return null;
         return ReportEntity.builder()
                 .id(report.getId())
+                .diagramId(report.getDiagramId())
                 .title(report.getTitle())
-                .description(report.getDescription())
+                .report(report.getReport())
                 .status(report.getStatus())
-                .createdBy(report.getCreatedBy())
-                .data(report.getData())
-                .s3Key(report.getS3Key())
+                .reportUrl(report.getReportUrl())
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())
                 .build();
@@ -26,12 +25,11 @@ public class ReportMapper {
         if (entity == null) return null;
         return Report.builder()
                 .id(entity.getId())
+                .diagramId(entity.getDiagramId())
                 .title(entity.getTitle())
-                .description(entity.getDescription())
+                .report(entity.getReport())
                 .status(entity.getStatus())
-                .createdBy(entity.getCreatedBy())
-                .data(entity.getData())
-                .s3Key(entity.getS3Key())
+                .reportUrl(entity.getReportUrl())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();

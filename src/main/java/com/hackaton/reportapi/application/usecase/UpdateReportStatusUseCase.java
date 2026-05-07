@@ -29,10 +29,10 @@ public class UpdateReportStatusUseCase {
         var updated = reportRepository.save(report);
 
         eventPublisherGateway.publish(ReportStatusEvent.builder()
-                .reportId(updated.getId())
+                .diagramId(updated.getDiagramId())
                 .status(updated.getStatus())
-                .s3Key(updated.getS3Key())
-                .updatedAt(updated.getUpdatedAt())
+                .reportLink(updated.getReportUrl())
+                .notes("")
                 .build());
 
         return toResponseDTO(updated);
@@ -41,13 +41,11 @@ public class UpdateReportStatusUseCase {
     private ReportResponseDTO toResponseDTO(Report report) {
         return ReportResponseDTO.builder()
                 .id(report.getId())
+                .diagramId(report.getDiagramId())
                 .title(report.getTitle())
-                .description(report.getDescription())
-                .type(report.getType())
+                .report(report.getReport())
                 .status(report.getStatus())
-                .createdBy(report.getCreatedBy())
-                .data(report.getData())
-                .s3Key(report.getS3Key())
+                .reportUrl(report.getReportUrl())
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())
                 .build();
