@@ -1,7 +1,5 @@
 package com.hackaton.reportapi.application.usecase;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hackaton.reportapi.application.dto.CreateReportRequestDTO;
 import com.hackaton.reportapi.domain.entity.Report;
 import com.hackaton.reportapi.domain.entity.ReportContent;
@@ -10,6 +8,7 @@ import com.hackaton.reportapi.domain.event.ReportStatusEvent;
 import com.hackaton.reportapi.domain.gateway.EventPublisherGateway;
 import com.hackaton.reportapi.domain.gateway.ReportRepository;
 import com.hackaton.reportapi.domain.gateway.StorageGateway;
+import com.hackaton.reportapi.infrastructure.pdf.PdfGeneratorService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,20 +39,20 @@ class CreateReportUseCaseTest {
     private EventPublisherGateway eventPublisherGateway;
 
     @Mock
-    private ObjectMapper objectMapper;
+    private PdfGeneratorService pdfGeneratorService;
 
     private CreateReportUseCase createReportUseCase;
 
-    private static final String BASE_URL = "http://localhost:8080";
+    private static final String S3_BASE_URL = "http://localhost:4566/reports-bucket";
     private static final String DIAGRAM_ID = "3f1c2b6e-9d4a-4d8f-8c3b-1e7f6a9d2c55";
 
     private CreateReportRequestDTO request;
     private Report savedReport;
 
     @BeforeEach
-    void setUp() throws JsonProcessingException {
+    void setUp() {
         createReportUseCase = new CreateReportUseCase(
-                reportRepository, storageGateway, eventPublisherGateway, objectMapper, BASE_URL);
+                reportRepository, storageGateway, eventPublisherGateway, pdfGeneratorService, S3_BASE_URL);
 
         var content = ReportContent.builder()
                 .components(List.of("component_01", "component_02"))
@@ -73,13 +72,13 @@ class CreateReportUseCaseTest {
                 .title("Architecture Report")
                 .report(content)
                 .status(ReportStatus.COMPLETED)
-                .reportUrl(BASE_URL + "/api/reports/report-id-1")
+                .reportUrl(S3_BASE_URL + "/reports/report-id-1.pdf")
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
-        when(storageGateway.upload(anyString(), anyString())).thenReturn("reports/report-id-1.json");
+        when(pdfGeneratorService.generate(any(Report.class))).thenReturn(new byte[]{});
+        when(storageGateway.uploadBytes(anyString(), any(byte[].class), anyString())).thenReturn("reports/report-id-1.pdf");
         when(reportRepository.save(any(Report.class))).thenReturn(savedReport);
     }
 
@@ -94,10 +93,11 @@ class CreateReportUseCaseTest {
     }
 
     @Test
-    void execute_shouldUploadReferenceToS3() {
+    void execute_shouldGenerateAndUploadPdfToS3() {
         createReportUseCase.execute(request);
 
-        verify(storageGateway).upload(anyString(), anyString());
+        verify(pdfGeneratorService).generate(any(Report.class));
+        verify(storageGateway).uploadBytes(anyString(), any(byte[].class), anyString());
     }
 
     @Test
@@ -110,7 +110,6 @@ class CreateReportUseCaseTest {
         var event = captor.getValue();
         assertThat(event.getDiagramId()).isEqualTo(DIAGRAM_ID);
         assertThat(event.getStatus()).isEqualTo(ReportStatus.COMPLETED);
-        assertThat(event.getReportLink()).isEqualTo(BASE_URL + "/api/reports/report-id-1");
         assertThat(event.getNotes()).isEmpty();
     }
 
@@ -120,17 +119,17 @@ class CreateReportUseCaseTest {
 
         assertThat(result.getId()).isNotNull();
         assertThat(result.getReport()).isNotNull();
-        assertThat(result.getReportUrl()).contains("/api/reports/");
+        assertThat(result.getReportUrl()).contains(".pdf");
         assertThat(result.getCreatedAt()).isNotNull();
         assertThat(result.getUpdatedAt()).isNotNull();
     }
 
     @Test
-    void execute_shouldUploadToS3WithCorrectKey() throws JsonProcessingException {
+    void execute_shouldUploadPdfWithCorrectKey() {
         createReportUseCase.execute(request);
 
         var keyCaptor = ArgumentCaptor.forClass(String.class);
-        verify(storageGateway).upload(keyCaptor.capture(), anyString());
-        assertThat(keyCaptor.getValue()).startsWith("reports/").endsWith(".json");
+        verify(storageGateway).uploadBytes(keyCaptor.capture(), any(byte[].class), anyString());
+        assertThat(keyCaptor.getValue()).startsWith("reports/").endsWith(".pdf");
     }
 }

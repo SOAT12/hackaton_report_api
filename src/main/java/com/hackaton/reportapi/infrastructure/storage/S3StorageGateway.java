@@ -32,4 +32,17 @@ public class S3StorageGateway implements StorageGateway {
         );
         return key;
     }
+
+    @Override
+    public String uploadBytes(String key, byte[] content, String contentType) {
+        s3Client.putObject(
+                PutObjectRequest.builder()
+                        .bucket(bucketName)
+                        .key(key)
+                        .contentType(contentType)
+                        .build(),
+                RequestBody.fromBytes(content)
+        );
+        return key;
+    }
 }

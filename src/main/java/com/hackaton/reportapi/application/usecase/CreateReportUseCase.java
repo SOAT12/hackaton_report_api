@@ -1,7 +1,5 @@
 package com.hackaton.reportapi.application.usecase;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hackaton.reportapi.application.dto.CreateReportRequestDTO;
 import com.hackaton.reportapi.application.dto.ReportResponseDTO;
 import com.hackaton.reportapi.domain.entity.Report;
@@ -10,12 +8,13 @@ import com.hackaton.reportapi.domain.event.ReportStatusEvent;
 import com.hackaton.reportapi.domain.gateway.EventPublisherGateway;
 import com.hackaton.reportapi.domain.gateway.ReportRepository;
 import com.hackaton.reportapi.domain.gateway.StorageGateway;
+import com.hackaton.reportapi.infrastructure.pdf.PdfGeneratorService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.UUID;
+
 
 @Service
 public class CreateReportUseCase {
@@ -23,25 +22,26 @@ public class CreateReportUseCase {
     private final ReportRepository reportRepository;
     private final StorageGateway storageGateway;
     private final EventPublisherGateway eventPublisherGateway;
-    private final ObjectMapper objectMapper;
-    private final String baseUrl;
+    private final PdfGeneratorService pdfGeneratorService;
+    private final String s3BaseUrl;
 
     public CreateReportUseCase(
             ReportRepository reportRepository,
             StorageGateway storageGateway,
             EventPublisherGateway eventPublisherGateway,
-            ObjectMapper objectMapper,
-            @Value("${app.base-url}") String baseUrl) {
+            PdfGeneratorService pdfGeneratorService,
+            @Value("${aws.s3.base-url}") String s3BaseUrl) {
         this.reportRepository = reportRepository;
         this.storageGateway = storageGateway;
         this.eventPublisherGateway = eventPublisherGateway;
-        this.objectMapper = objectMapper;
-        this.baseUrl = baseUrl;
+        this.pdfGeneratorService = pdfGeneratorService;
+        this.s3BaseUrl = s3BaseUrl;
     }
 
     public ReportResponseDTO execute(CreateReportRequestDTO request) {
         var id = UUID.randomUUID().toString();
-        var reportUrl = baseUrl + "/api/reports/" + id;
+        var pdfKey = "reports/" + id + ".pdf";
+        var reportUrl = s3BaseUrl + "/" + pdfKey;
         var now = LocalDateTime.now();
 
         var report = Report.builder()
@@ -57,7 +57,8 @@ public class CreateReportUseCase {
 
         var saved = reportRepository.save(report);
 
-        uploadToStorage(saved);
+        var pdfBytes = pdfGeneratorService.generate(saved);
+        storageGateway.uploadBytes(pdfKey, pdfBytes, "application/pdf");
 
         eventPublisherGateway.publish(ReportStatusEvent.builder()
                 .diagramId(saved.getDiagramId())
@@ -67,21 +68,6 @@ public class CreateReportUseCase {
                 .build());
 
         return toResponseDTO(saved);
-    }
-
-    private void uploadToStorage(Report report) {
-        try {
-            var key = "reports/" + report.getId() + ".json";
-            var payload = Map.of(
-                    "reportId", report.getId(),
-                    "diagramId", report.getDiagramId(),
-                    "url", report.getReportUrl()
-            );
-            var content = objectMapper.writeValueAsString(payload);
-            storageGateway.upload(key, content);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to serialize report reference for storage", e);
-        }
     }
 
     private ReportResponseDTO toResponseDTO(Report report) {
