@@ -30,7 +30,7 @@ public class AppConfig {
     @Bean
     public S3Client s3Client(
             @Value("${aws.region:us-east-1}") String region,
-            @Value("${aws.endpoint-override:}") String endpointOverride) {
+            @Value("${aws.s3.endpoint-override:}") String endpointOverride) {
         var builder = S3Client.builder().region(Region.of(region));
         Optional.of(endpointOverride).filter(e -> !e.isBlank()).ifPresent(endpoint -> {
             builder.endpointOverride(URI.create(endpoint));
@@ -43,7 +43,7 @@ public class AppConfig {
     @Bean
     public SqsClient sqsClient(
             @Value("${aws.region:us-east-1}") String region,
-            @Value("${aws.endpoint-override:}") String endpointOverride) {
+            @Value("${aws.sqs.endpoint-override:}") String endpointOverride) {
         var builder = SqsClient.builder().region(Region.of(region));
         Optional.of(endpointOverride).filter(e -> !e.isBlank()).ifPresent(endpoint -> {
             builder.endpointOverride(URI.create(endpoint));
