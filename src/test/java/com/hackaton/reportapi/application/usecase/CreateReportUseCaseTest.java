@@ -43,8 +43,8 @@ class CreateReportUseCaseTest {
 
     private CreateReportUseCase createReportUseCase;
 
-    private static final String S3_BASE_URL = "http://localhost:4566/reports-bucket";
     private static final String DIAGRAM_ID = "3f1c2b6e-9d4a-4d8f-8c3b-1e7f6a9d2c55";
+    private static final String REPORT_URL = "http://localhost:4566/reports-bucket/reports/report-id-1.pdf";
 
     private CreateReportRequestDTO request;
     private Report savedReport;
@@ -52,7 +52,7 @@ class CreateReportUseCaseTest {
     @BeforeEach
     void setUp() {
         createReportUseCase = new CreateReportUseCase(
-                reportRepository, storageGateway, eventPublisherGateway, pdfGeneratorService, S3_BASE_URL);
+                reportRepository, storageGateway, eventPublisherGateway, pdfGeneratorService);
 
         var content = ReportContent.builder()
                 .components(List.of("component_01", "component_02"))
@@ -72,13 +72,13 @@ class CreateReportUseCaseTest {
                 .title("Architecture Report")
                 .report(content)
                 .status(ReportStatus.COMPLETED)
-                .reportUrl(S3_BASE_URL + "/reports/report-id-1.pdf")
+                .reportUrl(REPORT_URL)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
 
         when(pdfGeneratorService.generate(any(Report.class))).thenReturn(new byte[]{});
-        when(storageGateway.uploadBytes(anyString(), any(byte[].class), anyString())).thenReturn("reports/report-id-1.pdf");
+        when(storageGateway.uploadBytes(anyString(), any(byte[].class), anyString())).thenReturn(REPORT_URL);
         when(reportRepository.save(any(Report.class))).thenReturn(savedReport);
     }
 

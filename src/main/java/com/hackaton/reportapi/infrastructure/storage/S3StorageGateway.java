@@ -14,10 +14,15 @@ public class S3StorageGateway implements StorageGateway {
 
     private final S3Client s3Client;
     private final String bucketName;
+    private final String baseUrl;
 
-    public S3StorageGateway(S3Client s3Client, @Value("${aws.s3.bucket-name}") String bucketName) {
+    public S3StorageGateway(
+            S3Client s3Client,
+            @Value("${aws.s3.bucket-name}") String bucketName,
+            @Value("${aws.s3.base-url}") String baseUrl) {
         this.s3Client = s3Client;
         this.bucketName = bucketName;
+        this.baseUrl = baseUrl;
     }
 
     @Override
@@ -43,6 +48,6 @@ public class S3StorageGateway implements StorageGateway {
                         .build(),
                 RequestBody.fromBytes(content)
         );
-        return key;
+        return baseUrl + "/" + key;
     }
 }

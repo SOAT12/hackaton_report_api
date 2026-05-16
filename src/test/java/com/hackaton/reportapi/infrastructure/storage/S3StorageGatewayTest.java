@@ -22,9 +22,11 @@ class S3StorageGatewayTest {
 
     private S3StorageGateway s3StorageGateway;
 
+    private static final String BASE_URL = "http://localhost:4566/test-bucket";
+
     @BeforeEach
     void setUp() {
-        s3StorageGateway = new S3StorageGateway(s3Client, "test-bucket");
+        s3StorageGateway = new S3StorageGateway(s3Client, "test-bucket", BASE_URL);
     }
 
     @Test
@@ -34,6 +36,15 @@ class S3StorageGatewayTest {
         var result = s3StorageGateway.upload(key, "{}");
 
         assertThat(result).isEqualTo(key);
+    }
+
+    @Test
+    void uploadBytes_shouldReturnFullUrl() {
+        var key = "reports/report-id-1.pdf";
+
+        var result = s3StorageGateway.uploadBytes(key, new byte[]{}, "application/pdf");
+
+        assertThat(result).isEqualTo(BASE_URL + "/" + key);
     }
 
     @Test
