@@ -13,27 +13,6 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-      localstack:
-        condition: service_healthy
-    networks:
-      - report-network
-
-  localstack:
-    image: localstack/localstack:3
-    ports:
-      - "4566:4566"
-    environment:
-      - SERVICES=s3,sqs
-      - AWS_DEFAULT_REGION=us-east-1
-      - LOCALSTACK_HOST=localstack
-    volumes:
-      - ./localstack-init:/etc/localstack/init/ready.d
-      - localstack-data:/var/lib/localstack
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
     networks:
       - report-network
 
@@ -53,7 +32,6 @@ services:
 
 volumes:
   mongo-data:
-  localstack-data:
 
 networks:
   report-network:
