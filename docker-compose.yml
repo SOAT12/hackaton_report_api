@@ -5,12 +5,11 @@ services:
     build: .
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
       - MONGODB_URI=mongodb://mongodb:27017/report_db
       - SPRING_PROFILES_ACTIVE=docker
-      - AWS_ACCESS_KEY_ID=local
-      - AWS_SECRET_ACCESS_KEY=local
-      - AWS_REGION=us-east-1
     depends_on:
       mongodb:
         condition: service_healthy
