@@ -9,7 +9,6 @@ import com.hackaton.reportapi.domain.gateway.EventPublisherGateway;
 import com.hackaton.reportapi.domain.gateway.ReportRepository;
 import com.hackaton.reportapi.domain.gateway.StorageGateway;
 import com.hackaton.reportapi.infrastructure.pdf.PdfGeneratorService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -23,25 +22,21 @@ public class CreateReportUseCase {
     private final StorageGateway storageGateway;
     private final EventPublisherGateway eventPublisherGateway;
     private final PdfGeneratorService pdfGeneratorService;
-    private final String s3BaseUrl;
 
     public CreateReportUseCase(
             ReportRepository reportRepository,
             StorageGateway storageGateway,
             EventPublisherGateway eventPublisherGateway,
-            PdfGeneratorService pdfGeneratorService,
-            @Value("${aws.s3.base-url}") String s3BaseUrl) {
+            PdfGeneratorService pdfGeneratorService) {
         this.reportRepository = reportRepository;
         this.storageGateway = storageGateway;
         this.eventPublisherGateway = eventPublisherGateway;
         this.pdfGeneratorService = pdfGeneratorService;
-        this.s3BaseUrl = s3BaseUrl;
     }
 
     public ReportResponseDTO execute(CreateReportRequestDTO request) {
         var id = UUID.randomUUID().toString();
         var pdfKey = "reports/" + id + ".pdf";
-        var reportUrl = s3BaseUrl + "/" + pdfKey;
         var now = LocalDateTime.now();
 
         var report = Report.builder()
@@ -50,15 +45,15 @@ public class CreateReportUseCase {
                 .title(request.getTitle())
                 .report(request.getReport())
                 .status(ReportStatus.COMPLETED)
-                .reportUrl(reportUrl)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
 
-        var saved = reportRepository.save(report);
+        var pdfBytes = pdfGeneratorService.generate(report);
+        var reportUrl = storageGateway.uploadBytes(pdfKey, pdfBytes, "application/pdf");
 
-        var pdfBytes = pdfGeneratorService.generate(saved);
-        storageGateway.uploadBytes(pdfKey, pdfBytes, "application/pdf");
+        report.setReportUrl(reportUrl);
+        var saved = reportRepository.save(report);
 
         eventPublisherGateway.publish(ReportStatusEvent.builder()
                 .diagramId(saved.getDiagramId())
