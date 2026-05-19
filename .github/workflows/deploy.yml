@@ -3,6 +3,11 @@ name: Deploy Report API
 on:
   push:
     branches: [ "main" ]
+    # O pipeline só vai rodar se houver alterações no código, Dockerfile ou pom.xml
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+      - 'Dockerfile'
 
 jobs:
   deploy:
@@ -16,9 +21,19 @@ jobs:
         with:
           distribution: 'corretto'
           java-version: '21'
+
+      # 1. Extrai a versão do pom.xml e salva numa variável de ambiente do GitHub
+      - name: Extract Maven Version
+        id: extract_version
+        run: |
+          # Adiciona permissão caso o wrapper não tenha
+          chmod +x ./mvnw || true 
+          POM_VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "APP_VERSION=$POM_VERSION" >> $GITHUB_ENV
+          echo "Versão identificada no pom.xml: $POM_VERSION"
           
       - name: Build with Maven
-        run: mvn clean package -DskipTests
+        run: ./mvnw clean package -DskipTests
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -32,30 +47,52 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
+      # 2. Faz o build usando a versão do POM como tag
       - name: Build, tag, and push image to Amazon ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: hackaton-report-api
-          IMAGE_TAG: latest
+          IMAGE_TAG: ${{ env.APP_VERSION }}
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
+      # 3. Faz o deploy repassando as credenciais para a EC2 e usando a versão correta
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.0
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ env.APP_VERSION }}
+          # Injetamos as secrets do GitHub nas variáveis de ambiente da Action
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          # Declaramos quais variáveis devem ser enviadas para dentro da EC2
+          envs: ECR_REGISTRY,IMAGE_TAG,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_SESSION_TOKEN
           script: |
-            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
-            docker pull ${{ steps.login-ecr.outputs.registry }}/hackaton-report-api:latest
+            # Exportamos as credenciais recebidas para a sessão do shell da EC2
+            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+            export AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN
+            export AWS_DEFAULT_REGION=us-east-1
+            
+            # Agora a EC2 consegue se autenticar!
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
+            
+            # Baixa e roda a imagem específica da versão do pom.xml
+            docker pull $ECR_REGISTRY/hackaton-report-api:$IMAGE_TAG
+            
             docker stop report-api || true
             docker rm report-api || true
+            
             docker run -d --name report-api \
               --net hackaton_net \
               --restart always \
               -p 8081:8080 \
               --env-file /home/ubuntu/.env \
               -e MONGODB_URI="mongodb://mongodb:27017/report_db" \
-              ${{ steps.login-ecr.outputs.registry }}/hackaton-report-api:latest
+              $ECR_REGISTRY/hackaton-report-api:$IMAGE_TAG
