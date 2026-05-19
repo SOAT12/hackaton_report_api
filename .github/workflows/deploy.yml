@@ -93,6 +93,9 @@ jobs:
               --net hackaton_net \
               --restart always \
               -p 8081:8080 \
+              -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+              -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+              -e AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN \
               --env-file /home/ubuntu/.env \
               -e MONGODB_URI="mongodb://mongodb:27017/report_db" \
               $ECR_REGISTRY/hackaton-report-api:$IMAGE_TAG
