@@ -1,24 +1,22 @@
-name: Deploy Hackaton Report API
+name: Deploy Report API
 
 on:
   push:
-    branches:
-      - master
+    branches: [ "main" ]
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up JDK 21
+      - name: Setup Java
         uses: actions/setup-java@v3
         with:
+          distribution: 'corretto'
           java-version: '21'
-          distribution: 'temurin'
-
+          
       - name: Build with Maven
         run: mvn clean package -DskipTests
 
@@ -27,30 +25,37 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build and push Docker image
+      - name: Build, tag, and push image to Amazon ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: hackaton-report-api
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE_TAG: latest
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      - name: Update kube config
-        run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region us-east-1
-
-      - name: Deploy to EKS
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          sed -i "s|<ECR_REGISTRY>/hackaton-report-api:latest|$ECR_REGISTRY/hackaton-report-api:$IMAGE_TAG|g" k8s/report-deployment.yaml
-          kubectl apply -f k8s/
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+            docker pull ${{ steps.login-ecr.outputs.registry }}/hackaton-report-api:latest
+            docker stop report-api || true
+            docker rm report-api || true
+            docker run -d --name report-api \
+              --net hackaton_net \
+              --restart always \
+              -p 8081:8080 \
+              --env-file /home/ubuntu/.env \
+              -e MONGODB_URI="mongodb://mongodb:27017/report_db" \
+              ${{ steps.login-ecr.outputs.registry }}/hackaton-report-api:latest
