@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -184,5 +185,39 @@ class ReportControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void listReports_withEmptyResult_shouldReturn200WithEmptyArray() throws Exception {
+        when(listReportsUseCase.execute(null)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/reports"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void getReport_shouldReturn500OnUnexpectedException() throws Exception {
+        when(getReportUseCase.execute("report-id-1")).thenThrow(new RuntimeException("unexpected"));
+
+        mockMvc.perform(get("/api/reports/report-id-1"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
+                .andExpect(jsonPath("$.status").value(500));
+    }
+
+    @Test
+    void createReport_withInvalidRequest_shouldReturn400WithValidationDetails() throws Exception {
+        var invalidRequest = CreateReportRequestDTO.builder()
+                .title("missing diagramId and report content")
+                .build();
+
+        mockMvc.perform(post("/api/reports")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(containsString("Validation failed")));
     }
 }

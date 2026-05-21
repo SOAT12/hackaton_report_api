@@ -48,6 +48,22 @@ class S3StorageGatewayTest {
     }
 
     @Test
+    void uploadBytes_shouldCallS3PutObjectWithCorrectParameters() {
+        var key = "reports/report-id-1.pdf";
+        var content = new byte[]{1, 2, 3};
+
+        s3StorageGateway.uploadBytes(key, content, "application/pdf");
+
+        var captor = ArgumentCaptor.forClass(PutObjectRequest.class);
+        verify(s3Client).putObject(captor.capture(), any(RequestBody.class));
+
+        var request = captor.getValue();
+        assertThat(request.bucket()).isEqualTo("test-bucket");
+        assertThat(request.key()).isEqualTo(key);
+        assertThat(request.contentType()).isEqualTo("application/pdf");
+    }
+
+    @Test
     void upload_shouldCallS3PutObjectWithCorrectParameters() {
         var key = "reports/report-id-1.json";
         var content = "{\"id\":\"report-id-1\"}";
