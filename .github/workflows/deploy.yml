@@ -84,11 +84,15 @@ jobs:
             # Agora a EC2 consegue se autenticar!
             aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
             
-            # Baixa e roda a imagem específica da versão do pom.xml
-            docker pull $ECR_REGISTRY/hackaton-report-api:$IMAGE_TAG
-            
+            # Para o container antes de liberar espaço
             docker stop report-api || true
             docker rm report-api || true
+
+            # Remove imagens, containers parados e camadas não utilizadas para liberar espaço
+            docker system prune -af
+
+            # Baixa e roda a imagem específica da versão do pom.xml
+            docker pull $ECR_REGISTRY/hackaton-report-api:$IMAGE_TAG
             
             docker run -d --name report-api \
               --net hackaton_net \
