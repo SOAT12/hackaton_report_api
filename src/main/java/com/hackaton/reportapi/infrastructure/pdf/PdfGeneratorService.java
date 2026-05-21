@@ -80,15 +80,48 @@ public class PdfGeneratorService {
         y -= 18;
 
         if (items != null) {
+            float bulletIndent = MARGIN + 10;
+            float bulletPrefix = regular.getStringWidth("• ") / 1000 * 11;
+            float maxLineWidth = CONTENT_WIDTH - 10;
+
             for (String item : items) {
-                cs.beginText();
-                cs.setFont(regular, 11);
-                cs.newLineAtOffset(MARGIN + 10, y);
-                cs.showText("• " + item);
-                cs.endText();
-                y -= 16;
+                List<String> lines = wrapText(item, regular, 11, maxLineWidth - bulletPrefix);
+                for (int i = 0; i < lines.size(); i++) {
+                    cs.beginText();
+                    cs.setFont(regular, 11);
+                    if (i == 0) {
+                        cs.newLineAtOffset(bulletIndent, y);
+                        cs.showText("• " + lines.get(i));
+                    } else {
+                        cs.newLineAtOffset(bulletIndent + bulletPrefix, y);
+                        cs.showText(lines.get(i));
+                    }
+                    cs.endText();
+                    y -= 16;
+                }
             }
         }
         return y;
+    }
+
+    private List<String> wrapText(String text, PDType1Font font, float fontSize, float maxWidth) throws IOException {
+        var lines = new java.util.ArrayList<String>();
+        String[] words = text.split(" ");
+        var current = new StringBuilder();
+
+        for (String word : words) {
+            String candidate = current.isEmpty() ? word : current + " " + word;
+            float width = font.getStringWidth(candidate) / 1000 * fontSize;
+            if (width > maxWidth && !current.isEmpty()) {
+                lines.add(current.toString());
+                current = new StringBuilder(word);
+            } else {
+                current = new StringBuilder(candidate);
+            }
+        }
+        if (!current.isEmpty()) {
+            lines.add(current.toString());
+        }
+        return lines;
     }
 }
