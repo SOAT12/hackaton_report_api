@@ -25,6 +25,10 @@
         <jacoco.version>0.8.11</jacoco.version>
         <assertj.version>3.27.7</assertj.version>
         <aws.sdk.version>2.26.31</aws.sdk.version>
+        <sonar.projectKey>SOAT12_hackaton_report_api</sonar.projectKey>
+        <sonar.organization>techchallenge-12soat</sonar.organization>
+        <sonar.scm.provider>git</sonar.scm.provider>
+        <sonar.coverage.jacoco.xmlReportPaths>target/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
     <dependencyManagement>
