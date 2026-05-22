@@ -10,18 +10,123 @@ on:
       - 'Dockerfile'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  deploy:
+  build-and-test:
+    name: Build & Unit Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21 and Cache Maven packages
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run Build and Tests
+        run: mvn -B verify
+
+      - name: Upload workspace for subsequent jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace
+          path: .
+
+      - name: Upload application artifact (.jar) for publishing
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-jar
+          path: target/*.jar
+
+  code-analysis:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout code (for SonarCloud SCM)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Download workspace
+        uses: actions/download-artifact@v4
+        with:
+          name: workspace
+
+      - name: Run SonarCloud Analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=SOAT12_techchallenge-12SOAT-os -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+
+  validate-dockerfile:
+    name: Validate Dockerfile
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Lint Dockerfile for best practices
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ./Dockerfile
+          ignore: DL3006
+
+
+      - name: Scan Dockerfile's base images for vulnerabilities with Trivy
+        uses: aquasecurity/trivy-action@v0.19.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [ code-analysis, validate-dockerfile ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          distribution: 'corretto'
+          distribution: 'temurin'
           java-version: '21'
+
+      - name: Download application artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: application-jar
+          path: target/
 
       # 1. Extrai a versão do pom.xml e salva numa variável de ambiente do GitHub
       - name: Extract Maven Version
@@ -32,7 +137,7 @@ jobs:
           POM_VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "APP_VERSION=$POM_VERSION" >> $GITHUB_ENV
           echo "Versão identificada no pom.xml: $POM_VERSION"
-          
+
       - name: Build with Maven
         run: ./mvnw clean package
 
@@ -80,6 +185,9 @@ jobs:
             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
             export AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN
             export AWS_DEFAULT_REGION=us-east-1
+
+            # Limpeza seletiva de imagens não utilizadas para liberar espaço, preservando containers parados
+            docker image prune -f
             
             # Agora a EC2 consegue se autenticar!
             aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
