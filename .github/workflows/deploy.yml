@@ -138,9 +138,6 @@ jobs:
           echo "APP_VERSION=$POM_VERSION" >> $GITHUB_ENV
           echo "Versão identificada no pom.xml: $POM_VERSION"
 
-      - name: Build with Maven
-        run: ./mvnw clean package
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
